@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>鉛直投げ上げシミュレーション</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .main-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .top-section {
+            flex: 1;
+            display: flex;
+            padding: 10px;
+            gap: 20px;
+            min-height: 0;
+        }
+        .controls-container {
+            width: 350px;
+            overflow-y: auto;
+        }
+        .simulation-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .simulation {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #ccc;
+            position: relative;
+            background: linear-gradient(to bottom, #87CEEB 0%, #f0f0f0 100%);
+            min-height: 400px;
+        }
+        .ball {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            position: absolute;
+            transition: top 0.05s linear;
+            z-index: 10;
+            background: radial-gradient(circle at 30% 30%, #90EE90, #006400);
+            border: 2px solid #004000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            left: calc(50% - 12.5px);
+        }
+        .strobe-ball {
+            width: 15px;
+            height: 15px;
+            border: 2px solid rgba(0, 128, 0, 0.6);
+            border-radius: 50%;
+            position: absolute;
+            pointer-events: none;
+            z-index: 5;
+            left: calc(50% - 7.5px);
+        }
+        .bottom-section {
+            height: 300px;
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background: #f9f9f9;
+        }
+        .chart-container {
+            flex: 1;
+            position: relative;
+        }
+        .controls {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .control-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 2px solid #006400;
+            border-radius: 10px;
+            background: #f0fff0;
+        }
+        .control-group h4 {
+            margin: 0 0 15px 0;
+            color: #006400;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .status {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .grid-line {
+            position: absolute;
+            width: 100%;
+            border-top: 1px dashed #999;
+            pointer-events: none;
+        }
+        .grid-label {
+            position: absolute;
+            right: 100%;
+            transform: translateY(-50%);
+            padding-right: 8px;
+            font-size: 12px;
+            color: #333;
+            font-weight: bold;
+            background: rgba(255,255,255,0.8);
+            padding: 2px 8px 2px 2px;
+            border-radius: 3px;
+        }
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 6px;
+            background: linear-gradient(to bottom, #8B4513, #654321);
+        }
+        .legend {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 20;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border: 1px solid #ddd;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            background: radial-gradient(circle at 30% 30%, #90EE90, #006400);
+            border: 2px solid #004000;
+        }
+        .main-controls {
+            text-align: center;
+            margin: 15px 0;
+        }
+        .main-controls button {
+            margin: 0 8px;
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .main-controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .start-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        .pause-btn {
+            background: #FF9800;
+            color: white;
+        }
+        .reset-btn {
+            background: #f44336;
+            color: white;
+        }
+        input[type="number"] {
+            width: 70px;
+            margin: 0 8px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        label {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+        .max-height-indicator {
+            position: absolute;
+            width: 100%;
+            border-top: 3px solid rgba(255, 0, 0, 0.8);
+            pointer-events: none;
+            z-index: 15;
+        }
+        .max-height-label {
+            position: absolute;
+            right: 100%;
+            transform: translateY(-50%);
+            padding-right: 8px;
+            font-size: 12px;
+            color: red;
+            font-weight: bold;
+            background: rgba(255,255,255,0.9);
+            padding: 2px 8px 2px 2px;
+            border-radius: 3px;
+        }
+        .pause-indicator {
+            position: absolute;
+            top: 20%;
+            right: 20px;
+            background: rgba(255, 0, 0, 0.9);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 30;
+            display: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="top-section">
+            <div class="controls-container">
+                <div class="main-controls">
+                    <button class="start-btn" onclick="startSimulation()">開始</button>
+                    <button class="pause-btn" onclick="pauseResumeSimulation()">一時停止/再開</button>
+                    <button class="reset-btn" onclick="resetSimulation()">リセット</button>
+                </div>
+                
+                <div class="controls">
+                    <div class="control-group">
+                        <h4>鉛直投げ上げ設定</h4>
+                        <label>初期高さ (m): </label>
+                        <input type="number" id="throwUpHeight" value="0" min="0" max="30" step="0.5" oninput="updateInitialPositions()">
+                        <br><br>
+                        <label>初速 (m/s): </label>
+                        <input type="number" id="throwUpVelocity" value="15" min="5" max="25" step="0.5" oninput="updateParameters()">
+                        <br><br>
+                        <label>開始時間 (s): </label>
+                        <input type="number" id="throwUpDelay" value="0" min="0" max="3" step="0.1" oninput="updateParameters()">
+                        <br><br>
+                        <label>
+                            <input type="checkbox" id="pauseAtMax" checked onchange="updateParameters()">
+                            最高点で一時停止
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="status" id="ballStatus"></div>
+            </div>
+            
+            <div class="simulation-container">
+                <div class="simulation" id="simulation">
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color"></div>
+                            <span>鉛直投げ上げ</span>
+                        </div>
+                    </div>
+                    <div class="ball" id="ballThrowUp"></div>
+                    <div class="ground"></div>
+                    <div class="pause-indicator" id="pauseIndicator">最高点</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bottom-section">
+            <div class="chart-container">
+                <canvas id="velocityChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="positionChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const g = 9.8;
+        let currentStep = 0;
+        const timeStep = 0.1; 
+        let isPaused = false; 
+        let simulationInterval;
+        let elapsedTime = 0;
+        let strobeBalls = [];
+        let strobeCounter = 0;
+        let maxHeightLine = null;
+        let pausedAtMax = false;
+        let maxHeightReached = false;
+        let previousVelocity = null;
+        
+        let params = {
+            throwUp: { 
+                h0: 0, 
+                v0: 15, 
+                delay: 0, 
+                active: false, 
+                finished: false, 
+                hitGround: false, 
+                pauseAtMax: true 
+            }
+        };
+        
+        function addGridLines() {
+            const simulation = document.getElementById('simulation');
+            const simRect = simulation.getBoundingClientRect();
+            const simHeight = simRect.height || 400;
+            const maxHeight = 30;
+            const gridInterval = 2;
+            const pixelsPerMeter = simHeight / maxHeight;
+            
+            const existingLines = simulation.querySelectorAll('.grid-line');
+            existingLines.forEach(line => line.remove());
+            
+            for (let m = 0; m <= maxHeight; m += gridInterval) {
+                const line = document.createElement('div');
+                line.className = 'grid-line';
+                const pixelPosition = simHeight - (m * pixelsPerMeter);
+                line.style.top = `${pixelPosition}px`;
+                
+                const label = document.createElement('div');
+                label.className = 'grid-label';
+                label.textContent = `${m} m`;
+                
+                line.appendChild(label);
+                simulation.appendChild(line);
+            }
+        }
+
+        function addMaxHeightLine() {
+            if (maxHeightLine) {
+                maxHeightLine.remove();
+            }
+            
+            const maxH = calculateMaxHeight();
+            const pixelY = heightToPixel(maxH);
+            
+            maxHeightLine = document.createElement('div');
+            maxHeightLine.className = 'max-height-indicator';
+            maxHeightLine.style.top = `${pixelY}px`;
+            
+            const label = document.createElement('div');
+            label.className = 'max-height-label';
+            label.textContent = `最高点: ${maxH.toFixed(1)} m`;
+            
+            maxHeightLine.appendChild(label);
+            document.getElementById('simulation').appendChild(maxHeightLine);
+        }
+
+        function calculateMaxHeight() {
+            const v0 = params.throwUp.v0;
+            const h0 = params.throwUp.h0;
+            return h0 + (v0 * v0) / (2 * g);
+        }
+
+        function initCharts() {
+            const vCtx = document.getElementById('velocityChart').getContext('2d');
+            const velocityChart = new Chart(vCtx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: '鉛直投げ上げ',
+                        data: [],
+                        backgroundColor: 'green',
+                        borderColor: 'green',
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: '時間 (s)',
+                                font: { size: 16 }
+                            },
+                            min: 0,
+                            max: 4.0,
+                            ticks: {
+                                font: { size: 14 }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '速度 (m/s) [上向き正]',
+                                font: { size: 16 }
+                            },
+                            min: -25,
+                            max: 25,
+                            ticks: {
+                                font: { size: 14 }
+                            },
+                            grid: {
+                                color: function(context) {
+                                    if (context.tick.value === 0) {
+                                        return 'rgba(255, 0, 0, 0.8)';
+                                    }
+                                    return 'rgba(0, 0, 0, 0.1)';
+                                },
+                                lineWidth: function(context) {
+                                    if (context.tick.value === 0) {
+                                        return 3;
+                                    }
+                                    return 1;
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                font: { size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+
+            const pCtx = document.getElementById('positionChart').getContext('2d');
+            const positionChart = new Chart(pCtx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: '鉛直投げ上げ',
+                        data: [],
+                        backgroundColor: 'green',
+                        borderColor: 'green',
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: '時間 (s)',
+                                font: { size: 16 }
+                            },
+                            min: 0,
+                            max: 4.0,
+                            ticks: {
+                                font: { size: 14 }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '高さ (m)',
+                                font: { size: 16 }
+                            },
+                            min: 0,
+                            max: 25,
+                            ticks: {
+                                font: { size: 14 }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                lineWidth: 1
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                font: { size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+
+            return { velocityChart, positionChart };
+        }
+
+        function getHeight(t) {
+            if (t < params.throwUp.delay) return params.throwUp.h0;
+            
+            const tRel = t - params.throwUp.delay;
+            return params.throwUp.h0 + params.throwUp.v0 * tRel - 0.5 * g * tRel * tRel;
+        }
+
+        function getVelocity(t) {
+            if (t < params.throwUp.delay) return params.throwUp.v0;
+            
+            const tRel = t - params.throwUp.delay;
+            return params.throwUp.v0 - g * tRel;
+        }
+
+        function heightToPixel(height) {
+            const simulation = document.getElementById('simulation');
+            const simRect = simulation.getBoundingClientRect();
+            const simHeight = simRect.height || 400;
+            const maxHeight = 30;
+            const pixelsPerMeter = simHeight / maxHeight;
+            return simHeight - (height * pixelsPerMeter);
+        }
+        
+        function addStrobeBall(t) {
+            const h = getHeight(t);
+            if (h < 0 || h > 30) return;
+            
+            const pixelY = heightToPixel(h);
+            const strobeBall = document.createElement('div');
+            strobeBall.className = 'strobe-ball';
+            strobeBall.style.top = `${pixelY}px`;
+            
+            document.getElementById('simulation').appendChild(strobeBall);
+            strobeBalls.push(strobeBall);
+            
+            if (strobeBalls.length > 40) {
+                const oldBall = strobeBalls.shift();
+                if (oldBall.parentNode) {
+                    oldBall.parentNode.removeChild(oldBall);
+                }
+            }
+        }
+        
+        function clearStrobeBalls() {
+            strobeBalls.forEach(element => {
+                if (element.parentNode) {
+                    element.parentNode.removeChild(element);
+                }
+            });
+            strobeBalls = [];
+        }
+
+        function updateSimulation() {
+            const t = elapsedTime;
+            let statusText = `時間: ${t.toFixed(1)} s<br><br>`;
+            
+            const param = params.throwUp;
+            const ball = document.getElementById('ballThrowUp');
+            
+            if (t >= param.delay && !param.finished) {
+                param.active = true;
+                const h = getHeight(t);
+                const v = getVelocity(t);
+                
+                if (param.pauseAtMax && !maxHeightReached) {
+                    const isAtMaxHeight = (previousVelocity !== null && previousVelocity > 0 && v <= 0) || 
+                                         (Math.abs(v) < 0.5 && h > param.h0 && !pausedAtMax);
+                    
+                    if (isAtMaxHeight) {
+                        pausedAtMax = true;
+                        maxHeightReached = true;
+                        isPaused = true;
+                        document.getElementById('pauseIndicator').style.display = 'block';
+                        statusText += `鉛直投げ上げ: <span style="color: red; font-weight: bold;">最高点到達!</span><br>`;
+                        statusText += `高さ: ${h.toFixed(2)}m, 速度: ${v.toFixed(2)}m/s<br>`;
+                        statusText += `<span style="color: red; font-weight: bold;">最高点で自動停止中 - 再開ボタンを押してください</span>`;
+                    }
+                }
+                
+                if (!pausedAtMax) {
+                    document.getElementById('pauseIndicator').style.display = 'none';
+                }
+                
+                if (h >= 0) {
+                    const pixelY = heightToPixel(h);
+                    ball.style.top = `${pixelY}px`;
+                    
+                    if (!pausedAtMax) {
+                        statusText += `鉛直投げ上げ: 高さ ${h.toFixed(2)}m, 速度 ${v.toFixed(2)}m/s<br>`;
+                        
+                        if (v > 0.1) {
+                            statusText += `状態: 上昇中<br>`;
+                        } else if (v < -0.1) {
+                            statusText += `状態: 下降中<br>`;
+                        } else {
+                            statusText += `状態: 最高点付近 (速度≈0)<br>`;
+                        }
+                    }
+                    
+                    if (strobeCounter % 2 === 0) {
+                        addStrobeBall(t);
+                    }
+                    
+                    velocityChart.data.datasets[0].data.push({x: t, y: v});
+                    positionChart.data.datasets[0].data.push({x: t, y: h});
+                } else if (!param.hitGround) {
+                    param.hitGround = true;
+                    param.finished = true;
+                    ball.style.top = `${heightToPixel(0)}px`;
+                    statusText += `鉛直投げ上げ: 地面到達<br>`;
+                    
+                    velocityChart.data.datasets[0].data.push({x: t, y: v});
+                    positionChart.data.datasets[0].data.push({x: t, y: 0});
+                } else {
+                    statusText += `鉛直投げ上げ: 地面到達済み<br>`;
+                }
+                
+                previousVelocity = v;
+            } else if (t < param.delay) {
+                const pixelY = heightToPixel(param.h0);
+                ball.style.top = `${pixelY}px`;
+                statusText += `鉛直投げ上げ: 待機中 (${(param.delay - t).toFixed(1)}s後開始)<br>`;
+            } else {
+                statusText += `鉛直投げ上げ: 終了<br>`;
+            }
+            
+            document.getElementById('ballStatus').innerHTML = statusText;
+            
+            return !param.hitGround && elapsedTime < 4.0;
+        }
+
+        function updateParameters() {
+            params.throwUp.v0 = parseFloat(document.getElementById('throwUpVelocity').value);
+            params.throwUp.delay = parseFloat(document.getElementById('throwUpDelay').value);
+            params.throwUp.pauseAtMax = document.getElementById('pauseAtMax').checked;
+            
+            if (maxHeightLine) {
+                addMaxHeightLine();
+            }
+        }
+
+        function updateInitialPositions() {
+            params.throwUp.h0 = parseFloat(document.getElementById('throwUpHeight').value);
+            
+            document.getElementById('ballThrowUp').style.top = `${heightToPixel(params.throwUp.h0)}px`;
+            
+            if (maxHeightLine) {
+                addMaxHeightLine();
+            }
+        }
+
+        let velocityChart, positionChart;
+
+        function startSimulation() {
+            resetSimulation();
+            updateParameters();
+            addMaxHeightLine();
+            
+            simulationInterval = setInterval(() => {
+                if (!isPaused) {
+                    if (updateSimulation()) {
+                        currentStep++;
+                        elapsedTime += timeStep;
+                        strobeCounter++;
+                        velocityChart.update('none');
+                        positionChart.update('none');
+                    } else {
+                        clearInterval(simulationInterval);
+                    }
+                }
+            }, 100);
+        }
+
+        function pauseResumeSimulation() {
+            isPaused = !isPaused;
+            if (!isPaused) {
+                pausedAtMax = false;
+                document.getElementById('pauseIndicator').style.display = 'none';
+            }
+        }
+
+        function resetSimulation() {
+            clearInterval(simulationInterval);
+            currentStep = 0;
+            isPaused = false;
+            elapsedTime = 0;
+            strobeCounter = 0;
+            pausedAtMax = false;
+            maxHeightReached = false;
+            previousVelocity = null;
+            clearStrobeBalls();
+            document.getElementById('pauseIndicator').style.display = 'none';
+            
+            params.throwUp.active = false;
+            params.throwUp.finished = false;
+            params.throwUp.hitGround = false;
+            
+            updateInitialPositions();
+            
+            velocityChart.data.datasets[0].data = [];
+            positionChart.data.datasets[0].data = [];
+            velocityChart.update();
+            positionChart.update();
+            
+            if (maxHeightLine) {
+                maxHeightLine.remove();
+                maxHeightLine = null;
+            }
+            
+            updateStatusDisplay();
+        }
+
+        function updateStatusDisplay() {
+            let statusText = `時間: 0.0 s<br><br>`;
+            statusText += `鉛直投げ上げ: 高さ ${params.throwUp.h0.toFixed(2)}m, 速度 ${params.throwUp.v0.toFixed(2)}m/s<br>`;
+            statusText += `最高到達予想: ${calculateMaxHeight().toFixed(2)}m`;
+            
+            document.getElementById('ballStatus').innerHTML = statusText;
+        }
+
+        window.onload = function() {
+            setTimeout(() => {
+                addGridLines();
+                const charts = initCharts();
+                velocityChart = charts.velocityChart;
+                positionChart = charts.positionChart;
+                updateParameters();
+                updateInitialPositions();
+                updateStatusDisplay();
+            }, 100);
+        };
+
+        window.addEventListener('resize', function() {
+            setTimeout(() => {
+                addGridLines();
+                updateInitialPositions();
+                if (maxHeightLine) {
+                    addMaxHeightLine();
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>
